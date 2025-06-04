@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LeafScan - Leaf Classification System</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .preview-image {
+            max-width: 300px;
+            max-height: 300px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .error-message {
+            background-color: #ffebee;
+            color: #c62828;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            border: 1px solid #e57373;
+        }
+        .success-message {
+            background-color: #e8f5e8;
+            color: #2e7d32;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            border: 1px solid #81c784;
+        }
+        .prediction-result {
+            background-color: #f3f4f6;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        .prediction-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            margin: 5px 0;
+            background-color: white;
+            border-radius: 5px;
+            border-left: 4px solid #4CAF50;
+        }
+        .confidence-bar {
+            width: 100px;
+            height: 10px;
+            background-color: #ddd;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        .confidence-fill {
+            height: 100%;
+            background-color: #4CAF50;
+            transition: width 0.3s ease;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 2s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .drag-drop-area {
+            border: 2px dashed #ccc;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            transition: border-color 0.3s ease;
+            cursor: pointer;
+        }
+        .drag-drop-area:hover {
+            border-color: #4CAF50;
+        }
+        .drag-drop-area.dragover {
+            border-color: #4CAF50;
+            background-color: #f0f8f0;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <h2>🌱 LeafScan</h2>
+            </div>
+            <div class="nav-menu">
+                <a href="#home" class="nav-link">Home</a>
+                <a href="#about" class="nav-link">About</a>
+                <a href="#how-it-works" class="nav-link">How It Works</a>
+            </div>
+        </div>
+    </nav>
+
+    <section id="home" class="hero">
+        <div class="container">
+            <div class="hero-content">
+                <h1>Plant Disease Classification</h1>
+                <p>Upload an image of a leaf and our AI will identify its species with high accuracy</p>
+                <a href="#upload" class="btn">Try It Now</a>
+            </div>
+        </div>
+    </section>
+
+    <section id="upload" class="upload-section">
+        <div class="container">
+            <h2>Upload Your Leaf Image</h2>
+            
+            <div class="upload-container">
+                <form id="uploadForm" enctype="multipart/form-data">
+                    <div class="drag-drop-area" id="dragDropArea">
+                        <!-- Default state -->
+                        <div id="uploadPrompt">
+                            <p>Drag & drop an image here or <strong>click to browse</strong></p>
+                        </div>
+                        
+                        <!-- Image Preview - INSIDE drag-drop area -->
+                        <div id="imagePreview" style="display: none;">
+                            <h3>Image Preview</h3>
+                            <p>Your image is ready for analysis</p>
+                            <img id="previewImg" class="preview-image" src="" alt="Preview">
+                            <br><br>
+                            <button id="analyzeBtn" class="btn">Analyze Leaf</button>
+                            <button id="cancelBtn" class="btn-secondary">Cancel</button>
+                        </div>
+                        
+                        <input type="file" id="imageInput" name="file" accept="image/*" style="display: none;">
+                    </div>
+                </form>
+
+                <!-- Loading Animation -->
+                <div class="loading" id="loadingDiv">
+                    <div class="spinner"></div>
+                    <p>Analyzing image...</p>
+                </div>
+
+                <!-- Results -->
+                <div id="results" style="display: none;"></div>
+                
+                <!-- Error Messages -->
+                <div id="errorMessage" style="display: none;"></div>
+            </div>
+        </div>
+    </section>
+
+    <section id="how-it-works" class="info-section">
+        <div class="container">
+            <h2>How It Works</h2>
+            <div class="steps">
+                <div class="step">
+                    <div class="step-icon">📸</div>
+                    <h3>Upload Image</h3>
+                    <p>Take a clear photo of a leaf or upload an existing image</p>
+                </div>
+                <div class="step">
+                    <div class="step-icon">🤖</div>
+                    <h3>AI Analysis</h3>
+                    <p>Our deep learning model analyzes the leaf characteristics</p>
+                </div>
+                <div class="step">
+                    <div class="step-icon">🎯</div>
+                    <h3>Get Results</h3>
+                    <p>Receive detailed classification with confidence scores</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <script>
+        // DOM Elements
+        const dragDropArea = document.getElementById('dragDropArea');
+        const imageInput = document.getElementById('imageInput');
+        const imagePreview = document.getElementById('imagePreview');
+        const previewImg = document.getElementById('previewImg');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const cancelBtn = document.getElementById('cancelBtn');
+        const loadingDiv = document.getElementById('loadingDiv');
+        const results = document.getElementById('results');
+        const errorMessage = document.getElementById('errorMessage');
+
+        // File input handling
+        dragDropArea.addEventListener('click', (e) => {
+            // Jangan trigger file picker jika click pada button atau preview area
+            if (e.target.tagName === 'BUTTON' || 
+                e.target.closest('#imagePreview') || 
+                imagePreview.style.display === 'block') {
+                return;
+            }
+            imageInput.click();
+        });
+
+        dragDropArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dragDropArea.classList.add('dragover');
+        });
+
+        dragDropArea.addEventListener('dragleave', () => {
+            dragDropArea.classList.remove('dragover');
+        });
+
+        dragDropArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dragDropArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                // IMPORTANT: Update imageInput.files untuk drag & drop
+                const dataTransfer = new DataTransfer();
+                dataTransfer.items.add(files[0]);
+                imageInput.files = dataTransfer.files;
+                
+                handleFile(files[0]);
+            }
+        });
+
+        imageInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        // Handle file selection
+        function handleFile(file) {
+            if (!file.type.startsWith('image/')) {
+                showError('Please select a valid image file.');
+                return;
+            }
+
+            // Clear previous results and errors only
+            results.style.display = 'none';
+            errorMessage.style.display = 'none';
+            loadingDiv.style.display = 'none';
+
+            // Show preview and hide upload prompt
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                previewImg.src = e.target.result;
+                
+                // Hide upload prompt, show preview
+                document.getElementById('uploadPrompt').style.display = 'none';
+                imagePreview.style.display = 'block';
+                
+                // Add class to drag-drop area
+                dragDropArea.classList.add('has-preview');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // Analyze button click
+        analyzeBtn.addEventListener('click', (e) => {
+            e.preventDefault(); // Prevent default behavior
+            e.stopPropagation(); // Stop event bubbling
+            
+            const file = imageInput.files[0];
+            if (!file) {
+                showError('Please select an image first.');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            // Show loading, keep preview visible
+            results.style.display = 'none';
+            errorMessage.style.display = 'none';
+            loadingDiv.style.display = 'block';
+
+            // Send to server
+            fetch('/predict', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                loadingDiv.style.display = 'none';
+                
+                if (data.error) {
+                    showError(data.error);
+                } else {
+                    showResults(data);
+                }
+            })
+            .catch(error => {
+                loadingDiv.style.display = 'none';
+                showError('Network error: ' + error.message);
+            });
+        });
+
+        // Cancel button
+        cancelBtn.addEventListener('click', (e) => {
+            e.preventDefault(); // Prevent default behavior
+            e.stopPropagation(); // Stop event bubbling
+            resetForm();
+        });
+
+        // Show results
+        function showResults(data) {
+            let html = '<div class="prediction-result">';
+            html += '<h3>🎯 Prediction Results</h3>';
+            
+            if (data.predictions && data.predictions.length > 0) {
+                html += '<div class="predictions">';
+                data.predictions.forEach((pred, index) => {
+                    const bgColor = index === 0 ? '#4CAF50' : '#81c784';
+                    html += `
+                        <div class="prediction-item">
+                            <div>
+                                <strong>${pred.class_name}</strong>
+                                <br><small>Rank #${pred.rank}</small>
+                            </div>
+                            <div>
+                                <span>${pred.percentage.toFixed(1)}%</span>
+                                <div class="confidence-bar">
+                                    <div class="confidence-fill" style="width: ${pred.percentage}%; background-color: ${bgColor};"></div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+            }
+            
+            html += '</div>';
+            html += '<button onclick="resetForm()" class="btn">Analyze Another Image</button>';
+            
+            results.innerHTML = html;
+            results.style.display = 'block';
+            
+            // Keep preview visible
+            // imagePreview.style.display = 'block'; // Keep this visible
+        }
+
+        // Show error
+        function showError(message) {
+            errorMessage.innerHTML = `<div class="error-message">${message}</div>`;
+            errorMessage.style.display = 'block';
+        }
+
+        // Hide all sections
+        function hideAllSections() {
+            imagePreview.style.display = 'none';
+            loadingDiv.style.display = 'none';
+            results.style.display = 'none';
+            errorMessage.style.display = 'none';
+        }
+
+        // Reset form
+        function resetForm() {
+            hideAllSections();
+            imageInput.value = '';
+            previewImg.src = '';
+            
+            // Show upload prompt, hide preview
+            document.getElementById('uploadPrompt').style.display = 'block';
+            imagePreview.style.display = 'none';
+            
+            // Remove class from drag-drop area
+            dragDropArea.classList.remove('has-preview');
+        }
+    </script>
+</body>
+</html>
